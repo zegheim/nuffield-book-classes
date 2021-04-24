@@ -8,8 +8,9 @@ from functools import cached_property
 import pytz
 import requests
 from bs4 import BeautifulSoup
+from dotenv import dotenv_values
 
-from config import API_URL, APP_ID, APP_KEY, PASSWORD, USERNAME
+from config import API_URL, APP_ID, APP_KEY
 
 
 class Lane(Enum):
@@ -44,10 +45,6 @@ class Booker(object):
         url = f"{API_URL}/login/sso/{company_id}"
         res = self.session.post(url, data={"token": token})
         return json.loads(res.content)
-
-    @cached_property
-    def _company_id(self) -> int:
-        return self._auth_info["_embedded"]["members"][0]["company_id"]
 
     @cached_property
     def _login_config(self) -> dict:
@@ -184,8 +181,17 @@ def main():
         default=8,
         help="How many days forward to book for, by default 8.",
     )
+    parser.add_argument(
+        "-e",
+        "--env",
+        metavar="PATH_TO_ENV_FILE",
+        type=str,
+        default=".env",
+        help="Path to .env file containing authentication information. Defaults to .env",
+    )
     args = parser.parse_args()
-    booker = Booker(USERNAME, PASSWORD)
+    config = dotenv_values(args.env)
+    booker = Booker(config["EMAIL"], config["PASSWORD"])
     booker.book(args.start_time, lane=Lane[args.lane], days_ahead=args.days_ahead)
 
 

@@ -12,6 +12,7 @@ requests = "*"
 bs4 = "*"
 lxml = "*"
 pytz = "*"
+python-dotenv = "*"
 
 [requires]
 python_version = "3.8"
