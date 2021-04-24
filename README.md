@@ -9,7 +9,8 @@ This repo uses [`pipenv`](https://pypi.org/project/pipenv/) to manage its depend
 # Installation
 
 1. Clone this repo.
-2. `cd` into the repo, and run `pipenv install`.
+2. `cd` into the repo, and run `pipenv install`.]
+3. Copy `config.py.example` to `config.py`, and fill in as needed.
 
 # Usage
 
