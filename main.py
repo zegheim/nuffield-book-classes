@@ -1,7 +1,7 @@
 import argparse
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from enum import Enum
 from functools import cached_property
 
@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import dotenv_values
 
-from config import API_URL, APP_ID, APP_KEY
+from config import API_URL, APP_ID, APP_KEY, BOOKING_OPEN_TIME
 
 
 class Lane(Enum):
@@ -157,6 +157,9 @@ class Booker(object):
 
 
 def main():
+    if not datetime.now().time() >= time(BOOKING_OPEN_TIME):
+        return
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "start_time",
@@ -190,6 +193,7 @@ def main():
         help="Path to .env file containing authentication information. Defaults to .env",
     )
     args = parser.parse_args()
+
     config = dotenv_values(args.env)
     booker = Booker(config["EMAIL"], config["PASSWORD"])
     booker.book(args.start_time, lane=Lane[args.lane], days_ahead=args.days_ahead)
