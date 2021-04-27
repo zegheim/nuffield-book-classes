@@ -1,7 +1,7 @@
 import argparse
 import json
 import re
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import cached_property
 
@@ -157,7 +157,7 @@ class Booker(object):
 
 
 def main():
-    if not datetime.now().time() >= time(BOOKING_OPEN_TIME):
+    if datetime.now().hour != BOOKING_OPEN_TIME:
         return
 
     parser = argparse.ArgumentParser()
