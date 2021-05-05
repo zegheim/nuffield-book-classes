@@ -215,10 +215,6 @@ def main():
     today = datetime.now().astimezone(pytz.timezone("Europe/London"))
     logger.info(f"Local time now is {today}.")
 
-    if today.hour != BOOKING_OPEN_TIME:
-        logger.warning(f"{today.hour} != {BOOKING_OPEN_TIME}. Skipping...")
-        return
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "start_time",
@@ -251,9 +247,18 @@ def main():
         default=".env",
         help="Path to .env file containing authentication information. Defaults to .env",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="If set, bypasses the hour check. Useful for debugging purposes.",
+    )
 
     args = parser.parse_args()
     logger.debug(f"Parsed args={args}")
+
+    if today.hour != BOOKING_OPEN_TIME:
+        logger.warning(f"{today.hour} != {BOOKING_OPEN_TIME}. Skipping...")
+        return
 
     env = dotenv_values(args.env)
     booker = Booker(env["EMAIL"], env["PASSWORD"])
