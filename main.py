@@ -256,7 +256,7 @@ def main():
     args = parser.parse_args()
     logger.debug(f"Parsed args={args}")
 
-    if today.hour != BOOKING_OPEN_TIME:
+    if today.hour != BOOKING_OPEN_TIME and not args.dry_run:
         logger.warning(f"{today.hour} != {BOOKING_OPEN_TIME}. Skipping...")
         return
 
