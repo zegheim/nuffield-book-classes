@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import re
 from datetime import datetime, timedelta
 from enum import Enum
@@ -27,6 +28,12 @@ class NoSlotsAvailable(Exception):
     pass
 
 
+class LoginError(Exception):
+    """For better semantics """
+
+    pass
+
+
 class Booker(object):
     def __init__(self, email: str, password: str):
         self.session = requests.Session()
@@ -41,17 +48,30 @@ class Booker(object):
 
     @cached_property
     def _auth_info(self) -> dict:
+        logger = logging.getLogger("Booker._auth_info")
         token, company_id = self._login(self.email, self.password)
         url = f"{API_URL}/login/sso/{company_id}"
+        logger.debug(f"Sending a POST request to {url}...")
         res = self.session.post(url, data={"token": token})
+        logger.debug(f"POST request succeeded, returning auth info.")
         return json.loads(res.content)
 
     @cached_property
     def _login_config(self) -> dict:
+        logger = logging.getLogger("Booker._login_config")
+        logger.debug(
+            "Sending a GET request to https://www.nuffieldhealth.com/account/idaaslogin"
+        )
         res = self.session.get("https://www.nuffieldhealth.com/account/idaaslogin")
         soup = BeautifulSoup(res.text, "lxml")
+        logger.debug("Attempting to scrape login config from returned page...")
         data_container = soup.find("script", {"data-container": True}).string
-        return json.loads(re.search(r"var SETTINGS = (.*);", data_container).group(1))
+        if not (settings := re.search(r"var SETTINGS = (.*);", data_container)):
+            message = "Unable to scrape login config!"
+            logger.error(message)
+            raise LoginError(message)
+        logger.debug("Successfully scraped login config.")
+        return json.loads(settings.group(1))
 
     @cached_property
     def _member_id(self) -> int:
@@ -73,13 +93,22 @@ class Booker(object):
         }
 
     def _checkout(self, slot: dict) -> None:
+        logger = logging.getLogger("Booker._checkout")
+        logger.info(f"Checking out {slot}...")
+
+        endpoint = f"{self._api_url}/basket/add_item"
         data = {"entire_basket": True, "items": [slot]}
-        self.session.post(f"{self._api_url}/basket/add_item", json=data)
+        logger.debug("Sending a POST request to {endpoint} with json={data}")
+        self.session.post(endpoint, json=data)
+
+        endpoint = f"{self._api_url}/basket/checkout"
         data = {"client": {"id": self._member_id}}
-        self.session.post(f"{self._api_url}/basket/checkout", json=data)
+        logger.debug("Sending a POST request to {endpoint} with json={data}")
+        self.session.post(endpoint, json=data)
 
     def _get_first_matching(self, slots: list, lane: Lane, start_time: int) -> dict:
-        return next(
+        logger = logging.getLogger("Booker._get_first_matching")
+        first_matching_slot = next(
             {
                 "event_id": slot["event_id"],
                 "event_chain_id": slot["event_chain_id"],
@@ -88,42 +117,63 @@ class Booker(object):
             for slot in slots
             if slot["lane"] == lane and slot["start_time"] == start_time
         )
+        logger.info(
+            f"{first_matching_slot} matches lane={lane} and start_time={start_time}"
+        )
+        return first_matching_slot
 
     def _get_slots_for(self, target_date: datetime) -> list:
+        logger = logging.getLogger("Booker._get_slots_for")
         date_str = target_date.strftime("%Y-%m-%d")
+        logger.info(f"Retrieving slots for {date_str}...")
         params = {
             "start_date": date_str,
             "end_date": date_str,
             "include_non_bookable": False,
         }
-        res = self.session.get(f"{self._api_url}/events", params=params)
-        return [
+        endpoint = f"{self._api_url}/events"
+        logger.debug(f"Sending a GET request to {endpoint} with params={params}")
+        res = self.session.get(endpoint, params=params)
+        slots = [
             Booker._transform(slot)
             for slot in json.loads(res.content)["_embedded"]["events"]
         ]
+        logger.info(f"Found {len(slots)} available slots for {date_str}.")
+        return slots
 
     def _login(self, email: str, password: str) -> tuple:
+        logger = logging.getLogger("Booker._login")
+
+        logger.debug("Updating session headers with scraped CSRF token...")
         self.session.headers.update({"X-CSRF-TOKEN": self._login_config["csrf"]})
+
         base_url = f"https://account.nuffieldhealth.com/{self._login_config['hosts']['tenant']}"
         params = {
             "tx": self._login_config["transId"],
             "p": self._login_config["hosts"]["policy"],
         }
         data = {"request_type": "RESPONSE", "email": email, "password": password}
-        self.session.post(f"{base_url}/SelfAsserted", params=params, data=data)
+        endpoint = f"{base_url}/SelfAsserted"
+
+        logger.debug(
+            f"Sending a POST request to {endpoint} with params={params}, data={data}"
+        )
+        self.session.post(endpoint, params=params, data=data)
 
         params.update({"csrf_token": self._login_config.get("csrf")})
-        res = self.session.get(
-            f"{base_url}/api/{self._login_config['api']}/confirmed", params=params
-        )
+        endpoint = f"{base_url}/api/{self._login_config['api']}/confirmed"
+        logger.debug(f"Sending a GET request to {endpoint} with params={params}")
+        res = self.session.get(endpoint, params=params)
 
         soup = BeautifulSoup(res.text, "lxml")
-        url = soup.find("form", id="auto").get("action")
-        code = soup.find("input", id="code").get("value")
-        res = self.session.post(url, data={"code": code})
+        endpoint = soup.find("form", id="auto").get("action")
+        data = {"code": soup.find("input", id="code").get("value")}
+        logger.debug(f"Sending a POST request to {endpoint} with data={data}")
+        res = self.session.post(endpoint, data=data)
 
         soup = BeautifulSoup(res.text, "lxml")
         api_auth_info = soup.find("div", {"member-sso-login": True, "company-id": True})
+        logger.info(f"Got API auth info {api_auth_info}")
 
         return api_auth_info.get("member-sso-login"), api_auth_info.get("company-id")
 
@@ -144,8 +194,11 @@ class Booker(object):
         NoSlotsAvailable
             When the specified filters are too narrow.
         """
+        logger = logging.getLogger("Booker.book")
         today = datetime.now().astimezone(pytz.timezone("Europe/London"))
         target_date = today + timedelta(days=days_ahead)
+        logger.info(f"Booking slot with start={start} and lane={lane} on {target_date}")
+
         slots = self._get_slots_for(target_date)
         try:
             slot = self._get_first_matching(slots, lane, start)
@@ -157,7 +210,13 @@ class Booker(object):
 
 
 def main():
-    if datetime.now().hour != BOOKING_OPEN_TIME:
+    logger = logging.getLogger("main")
+
+    today = datetime.now().astimezone(pytz.timezone("Europe/London"))
+    logger.info(f"Local time now is {today}.")
+
+    if today.hour != BOOKING_OPEN_TIME:
+        logger.warn(f"{today.hour} != {BOOKING_OPEN_TIME}. Skipping...")
         return
 
     parser = argparse.ArgumentParser()
@@ -192,10 +251,12 @@ def main():
         default=".env",
         help="Path to .env file containing authentication information. Defaults to .env",
     )
-    args = parser.parse_args()
 
-    config = dotenv_values(args.env)
-    booker = Booker(config["EMAIL"], config["PASSWORD"])
+    args = parser.parse_args()
+    logger.debug(f"Parsed args={args}")
+
+    env = dotenv_values(args.env)
+    booker = Booker(env["EMAIL"], env["PASSWORD"])
     booker.book(args.start_time, lane=Lane[args.lane], days_ahead=args.days_ahead)
 
 
