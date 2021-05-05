@@ -216,7 +216,7 @@ def main():
     logger.info(f"Local time now is {today}.")
 
     if today.hour != BOOKING_OPEN_TIME:
-        logger.warn(f"{today.hour} != {BOOKING_OPEN_TIME}. Skipping...")
+        logger.warning(f"{today.hour} != {BOOKING_OPEN_TIME}. Skipping...")
         return
 
     parser = argparse.ArgumentParser()
