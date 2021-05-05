@@ -221,7 +221,6 @@ class Booker(object):
 
 def main():
     logger = logging.getLogger("main")
-
     today = datetime.now().astimezone(pytz.timezone("Europe/London"))
     logger.info(f"Local time now is {today}.")
 
@@ -276,4 +275,6 @@ def main():
 
 
 if __name__ == "__main__":
+    FORMAT = "[%(asctime)s] [%(name)-21s] %(levelname)-5s - %(message)s"
+    logging.basicConfig(level=logging.INFO, format=FORMAT)
     main()
