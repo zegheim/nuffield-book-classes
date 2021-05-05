@@ -1,8 +1,8 @@
 import logging
 
 
-def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
-    logger = logging.getLogger(f"{__name__}.{name}")
+def get_logger(name: str, module: str, level: int = logging.INFO) -> logging.Logger:
+    logger = logging.getLogger(f"{module}.{name}")
     logger.setLevel(level)
     ch = logging.StreamHandler()
     formatter = logging.Formatter(

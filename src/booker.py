@@ -28,7 +28,7 @@ class Booker(object):
 
     @cached_property
     def _auth_info(self) -> dict:
-        logger = get_logger("Booker._auth_info", level=logging.DEBUG)
+        logger = get_logger("Booker._auth_info", __name__, level=logging.DEBUG)
         token, company_id = self._login(self.email, self.password)
         url = f"{API_URL}/login/sso/{company_id}"
         logger.debug(f"Sending a POST request to {url}...")
@@ -38,7 +38,7 @@ class Booker(object):
 
     @cached_property
     def _login_config(self) -> dict:
-        logger = get_logger("Booker._login_config", level=logging.DEBUG)
+        logger = get_logger("Booker._login_config", __name__, level=logging.DEBUG)
         logger.debug(
             "Sending a GET request to https://www.nuffieldhealth.com/account/idaaslogin"
         )
@@ -73,7 +73,7 @@ class Booker(object):
         }
 
     def _checkout(self, slot: dict) -> None:
-        logger = get_logger("Booker._checkout", level=logging.DEBUG)
+        logger = get_logger("Booker._checkout", __name__, level=logging.DEBUG)
         logger.info(f"Checking out {slot}...")
 
         endpoint = f"{self._api_url}/basket/add_item"
@@ -87,7 +87,7 @@ class Booker(object):
         self.session.post(endpoint, json=data)
 
     def _get_first_matching(self, slots: list, lane: Lane, start_time: int) -> dict:
-        logger = get_logger("Booker._get_first_matching", level=logging.DEBUG)
+        logger = get_logger("Booker._get_first_matching", __name__, level=logging.DEBUG)
         first_matching_slot = next(
             {
                 "event_id": slot["event_id"],
@@ -103,7 +103,7 @@ class Booker(object):
         return first_matching_slot
 
     def _get_slots_for(self, target_date: datetime) -> list:
-        logger = get_logger("Booker._get_slots_for", level=logging.DEBUG)
+        logger = get_logger("Booker._get_slots_for", __name__, level=logging.DEBUG)
         date_str = target_date.strftime("%Y-%m-%d")
         logger.info(f"Retrieving slots for {date_str}...")
         params = {
@@ -122,7 +122,7 @@ class Booker(object):
         return slots
 
     def _login(self, email: str, password: str) -> tuple:
-        logger = get_logger("Booker._login", level=logging.DEBUG)
+        logger = get_logger("Booker._login", __name__, level=logging.DEBUG)
 
         logger.debug("Updating session headers with scraped CSRF token...")
         self.session.headers.update({"X-CSRF-TOKEN": self._login_config["csrf"]})
@@ -174,7 +174,7 @@ class Booker(object):
         NoSlotsAvailable
             When the specified filters are too narrow.
         """
-        logger = get_logger("Booker.book")
+        logger = get_logger("Booker.book", __name__)
         today = datetime.now().astimezone(pytz.timezone("Europe/London"))
         target_date = today + timedelta(days=days_ahead)
         logger.info(f"Booking slot with start={start} and lane={lane} on {target_date}")

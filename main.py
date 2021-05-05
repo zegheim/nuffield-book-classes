@@ -14,7 +14,7 @@ from src.log import get_logger
 
 
 def main():
-    logger = get_logger("main", level=logging.DEBUG)
+    logger = get_logger("main", __name__, level=logging.DEBUG)
     today = datetime.now().astimezone(pytz.timezone("Europe/London"))
     logger.info(f"Local time now is {today}.")
 
