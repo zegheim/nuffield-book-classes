@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import logging
@@ -17,9 +19,17 @@ from config import API_URL, APP_ID, APP_KEY, BOOKING_OPEN_TIME
 class Lane(Enum):
     """ Types of lane available """
 
+    UNKNOWN = 0
     SLOW = 1
     MEDIUM = 2
     FAST = 3
+
+    @staticmethod
+    def get(key: str) -> Lane:
+        try:
+            return Lane[key]
+        except KeyError:
+            return Lane["UNKNOWN"]
 
 
 class NoSlotsAvailable(Exception):
@@ -84,10 +94,10 @@ class Booker(object):
     @staticmethod
     def _transform(slot: dict) -> dict:
         start_time = datetime.strptime(slot["datetime"], "%Y-%m-%dT%H:%M:%S%z")
-        lane = slot["description"].split(" ", 1)[0]
+        lane = slot["description"].split(" ", 1)[0].upper()
         return {
             "start_time": int(f"{start_time.hour:d}{start_time.minute:02d}"),
-            "lane": Lane[lane.upper()],
+            "lane": Lane.get(lane),
             "event_id": slot["id"],
             "event_chain_id": slot["event_chain_id"],
         }
