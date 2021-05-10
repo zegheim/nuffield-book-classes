@@ -78,12 +78,12 @@ class Booker(object):
 
         endpoint = f"{self._api_url}/basket/add_item"
         data = {"entire_basket": True, "items": [slot]}
-        logger.debug("Sending a POST request to {endpoint} with json={data}")
+        logger.debug(f"Sending a POST request to {endpoint} with json={data}")
         self.session.post(endpoint, json=data)
 
         endpoint = f"{self._api_url}/basket/checkout"
         data = {"client": {"id": self._member_id}}
-        logger.debug("Sending a POST request to {endpoint} with json={data}")
+        logger.debug(f"Sending a POST request to {endpoint} with json={data}")
         self.session.post(endpoint, json=data)
 
     def _get_first_matching(self, slots: list, lane: Lane, start_time: int) -> dict:
