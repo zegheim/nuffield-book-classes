@@ -6,7 +6,7 @@ def get_logger(name: str, module: str, level: int = logging.INFO) -> logging.Log
     logger.setLevel(level)
     ch = logging.StreamHandler()
     formatter = logging.Formatter(
-        "[{asctime}] {name:<32s} {levelname:<8s} - {message}", style="{"
+        "[{asctime}] {name:<37s} {levelname:<8s} - {message}", style="{"
     )
     ch.setFormatter(formatter)
     logger.addHandler(ch)
