@@ -33,8 +33,9 @@ class Booker(object):
         url = f"{API_URL}/login/sso/{company_id}"
         logger.debug(f"Sending a POST request to {url}...")
         res = self.session.post(url, data={"token": token})
-        logger.debug(f"POST request succeeded, returning auth info.")
-        return json.loads(res.content)
+        auth_info = json.loads(res.content)
+        logger.debug(f"POST request succeeded, returning auth info={auth_info}")
+        return auth_info
 
     @cached_property
     def _login_config(self) -> dict:
