@@ -8,6 +8,7 @@ import pytz
 import requests
 from bs4 import BeautifulSoup
 from config import API_URL, APP_ID, APP_KEY
+from requests.exceptions import HTTPError
 
 from src.errors import LoginError, NoSlotsAvailable
 from src.lane import Lane
@@ -22,6 +23,24 @@ class Booker(object):
         self.session.headers.update({"App-Id": APP_ID, "App-Key": APP_KEY})
         self.session.headers.update({"Auth-Token": self._sso_token})
 
+    def _post(self, endpoint, exception_msg="POST request failed.", **kwargs):
+        logger = get_logger("Booker._post", __name__, level=logging.DEBUG)
+        kwargs_str = (
+            "..."
+            if not kwargs
+            else f' with {", ".join(f"{k}={v}" for k, v in kwargs.items())}...'
+        )
+        logger.debug(f"Sending a POST request to {endpoint}{kwargs_str}")
+        res = self.session.post(endpoint, **kwargs)
+
+        try:
+            res.raise_for_status()
+        except HTTPError as err:
+            logger.exception(exception_msg)
+            raise err
+
+        return res
+
     @cached_property
     def _api_url(self) -> str:
         return f"{API_URL}/37018"
@@ -31,10 +50,11 @@ class Booker(object):
         logger = get_logger("Booker._auth_info", __name__, level=logging.DEBUG)
         token, company_id = self._login(self.email, self.password)
         url = f"{API_URL}/login/sso/{company_id}"
-        logger.debug(f"Sending a POST request to {url}...")
-        res = self.session.post(url, data={"token": token})
+        res = self._post(
+            url, exception_msg="Failed to retrieve auth_info.", data={"token": token}
+        )
         auth_info = json.loads(res.content)
-        logger.debug(f"POST request succeeded, returning auth info={auth_info}")
+        logger.debug(f"Got auth_info={auth_info}")
         return auth_info
 
     @cached_property
@@ -79,13 +99,11 @@ class Booker(object):
 
         endpoint = f"{self._api_url}/basket/add_item"
         data = {"entire_basket": True, "items": [slot]}
-        logger.debug(f"Sending a POST request to {endpoint} with json={data}")
-        self.session.post(endpoint, json=data)
+        self._post(endpoint, exception_msg="Failed to add slot to basket.", json=data)
 
         endpoint = f"{self._api_url}/basket/checkout"
         data = {"client": {"id": self._member_id}}
-        logger.debug(f"Sending a POST request to {endpoint} with json={data}")
-        self.session.post(endpoint, json=data)
+        self._post(endpoint, exception_msg="Failed to checkout basket.", json=data)
 
     def _get_first_matching(self, slots: list, lane: Lane, start_time: int) -> dict:
         logger = get_logger("Booker._get_first_matching", __name__, level=logging.DEBUG)
@@ -135,11 +153,7 @@ class Booker(object):
         }
         data = {"request_type": "RESPONSE", "email": email, "password": password}
         endpoint = f"{base_url}/SelfAsserted"
-
-        logger.debug(
-            f"Sending a POST request to {endpoint} with params={params}, data={data}"
-        )
-        self.session.post(endpoint, params=params, data=data)
+        self._post(endpoint, params=params, data=data)
 
         params.update({"csrf_token": self._login_config.get("csrf")})
         endpoint = f"{base_url}/api/{self._login_config['api']}/confirmed"
@@ -149,8 +163,7 @@ class Booker(object):
         soup = BeautifulSoup(res.text, "lxml")
         endpoint = soup.find("form", id="auto").get("action")
         data = {"code": soup.find("input", id="code").get("value")}
-        logger.debug(f"Sending a POST request to {endpoint} with data={data}")
-        res = self.session.post(endpoint, data=data)
+        res = self._post(endpoint, data=data)
 
         soup = BeautifulSoup(res.text, "lxml")
         api_auth_info = soup.find("div", {"member-sso-login": True, "company-id": True})
